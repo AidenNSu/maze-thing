@@ -1,0 +1,241 @@
+import java.util.*;
+
+class MazeGenerator {
+    private final int[] dRow = {0, 1, 0, -1};  // Right, Down, Left, Up
+    private final int[] dCol = {1, 0, -1, 0};
+
+    private int[][] maze;
+    private boolean[][] visited;
+    private int rows, cols;
+
+    public MazeGenerator(int rows, int cols) {
+        this.rows = rows;
+        this.cols = cols;
+        maze = new int[rows][cols];
+        visited = new boolean[rows][cols];
+
+        // Initialize the maze with walls
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                maze[i][j] = 1;  // WALL
+            }
+        }
+    }
+
+    // Recursive backtracking algorithm with more randomness and better connectivity
+    public void generateMaze(int row, int col) {
+        // Mark current cell as visited
+        visited[row][col] = true;
+        maze[row][col] = 0;  // Open path
+
+        // Shuffle directions to add randomness
+        List<Integer> directions = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            directions.add(i);
+        }
+        Collections.shuffle(directions);
+
+        // Try all four directions (Right, Down, Left, Up)
+        for (int direction : directions) {
+            int newRow = row + dRow[direction] * 2;
+            int newCol = col + dCol[direction] * 2;
+
+            if (isValid(newRow, newCol) && !visited[newRow][newCol]) {
+                // Remove the wall between the current cell and the new cell
+                maze[row + dRow[direction]][col + dCol[direction]] = 0;
+                generateMaze(newRow, newCol);
+            }
+        }
+
+        // Create additional random paths (to ensure multiple connections)
+        createRandomPaths(row, col);
+    }
+
+    // Create random connections between different parts of the maze to ensure more paths
+    private void createRandomPaths(int row, int col) {
+        Random rand = new Random();
+        // Sometimes create a path to a nearby area if possible (for more connectivity)
+        for (int i = 0; i < 1; i++) {
+            int newRow = row + dRow[i] * 2;
+            int newCol = col + dCol[i] * 2;
+            if (isValid(newRow, newCol) && rand.nextBoolean()) {
+                maze[row + dRow[i]][col + dCol[i]] = 0;
+                visited[newRow][newCol] = true;
+            }
+        }
+    }
+
+    // Check if the new cell is within bounds
+    private boolean isValid(int row, int col) {
+        return row > 0 && row < rows - 1 && col > 0 && col < cols - 1;
+    }
+
+    // Print the maze (for visualization purposes)
+    public void printMaze(int playerRow, int playerCol, int finishRow, int finishCol) {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                if (i == playerRow && j == playerCol) {
+                    System.out.print(" #");  // Player
+                } else if (i == finishRow && j == finishCol) {
+                    System.out.print(" 私");  // Finish line (exit)
+                } else if (maze[i][j] == 1) {
+                    System.out.print(" █");  // Wall
+                } else {
+                    System.out.print("  ");  // Path
+                }
+            }
+            System.out.println();
+        }
+    }
+
+    // Check if the position is a valid move (within the maze and not a wall)
+    public boolean isMoveValid(int row, int col) {
+        return row >= 0 && row < rows && col >= 0 && col < cols && maze[row][col] == 0;
+    }
+
+    // Ensure that the finish line is not blocked
+    public void ensureFinishLineAccessible(int finishRow, int finishCol) {
+        // Ensure the finish line and its neighboring cells are not walls
+        maze[finishRow][finishCol] = 0;  // Make the finish line an open path
+        if (finishRow > 0) maze[finishRow - 1][finishCol] = 0; // Top cell
+        if (finishRow < rows - 1) maze[finishRow + 1][finishCol] = 0; // Bottom cell
+        if (finishCol > 0) maze[finishRow][finishCol - 1] = 0; // Left cell
+        if (finishCol < cols - 1) maze[finishRow][finishCol + 1] = 0; // Right cell
+    }
+
+    // Hash the entire maze state to track its configuration
+    public String getMazeHash() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                sb.append(maze[i][j]);
+            }
+        }
+        return Integer.toHexString(sb.toString().hashCode());
+    }
+
+    // Find the fastest path (shortest path) using BFS
+    public List<int[]> findFastestPath(int startRow, int startCol, int finishRow, int finishCol) {
+        Queue<List<int[]>> queue = new LinkedList<>();
+        List<int[]> startPath = new ArrayList<>();
+        startPath.add(new int[]{startRow, startCol});
+        queue.offer(startPath);
+
+        boolean[][] visited = new boolean[rows][cols];
+        visited[startRow][startCol] = true;
+
+        while (!queue.isEmpty()) {
+            List<int[]> path = queue.poll();
+            int[] current = path.get(path.size() - 1);
+            int currentRow = current[0];
+            int currentCol = current[1];
+
+            // If we reached the finish, return the path
+            if (currentRow == finishRow && currentCol == finishCol) {
+                return path;
+            }
+
+            // Explore the neighbors
+            for (int i = 0; i < 4; i++) {
+                int newRow = currentRow + dRow[i];
+                int newCol = currentCol + dCol[i];
+                if (isValid(newRow, newCol) && !visited[newRow][newCol]) {
+                    visited[newRow][newCol] = true;
+                    List<int[]> newPath = new ArrayList<>(path);
+                    newPath.add(new int[]{newRow, newCol});
+                    queue.offer(newPath);
+                }
+            }
+        }
+        return null;  // No path found
+    }
+}
+
+class MazeGeneration {
+    public static void main(String[] args) {
+        Random rand = new Random();
+        int sizemax = 30, sizemin = 25;
+        int rows = rand.nextInt(sizemax - sizemin + 1) + sizemin;  // Rows of the maze
+        int cols = rand.nextInt(sizemax - sizemin + 1) + sizemin; // Columns of the maze
+
+        // Initialize MazeGenerator
+        MazeGenerator mazeGenerator = new MazeGenerator(rows, cols);
+        mazeGenerator.generateMaze(1, 1);  // Start maze generation from (1, 1)
+
+        // Define start and finish positions
+        int startRow = 1, startCol = 1;
+        int finishRow = rows - 2, finishCol = cols - 2;
+
+        // Ensure the finish line is accessible and not blocked
+        mazeGenerator.ensureFinishLineAccessible(finishRow, finishCol);
+
+        // Print the maze hash
+        String mazeHash = mazeGenerator.getMazeHash();
+        System.out.println("Maze Hash: " + mazeHash);
+
+        // Player's starting position
+        int playerRow = startRow, playerCol = startCol;
+
+        Scanner scanner = new Scanner(System.in);
+        boolean gameRunning = true;
+
+        // Game loop
+        while (gameRunning) {
+            // Print the maze with player position and finish line
+            System.out.println("Use WASD to move: W = Up, A = Left, S = Down, D = Right");
+            mazeGenerator.printMaze(playerRow, playerCol, finishRow, finishCol);
+            System.out.println("Player position: (" + playerRow + ", " + playerCol + ")");
+
+            System.out.print("Enter move: ");
+            String move = scanner.nextLine().toUpperCase();
+
+            int newRow = playerRow;
+            int newCol = playerCol;
+
+            // Process the move input
+            switch (move) {
+                case "W":  // Up
+                    newRow--;
+                    break;
+                case "A":  // Left
+                    newCol--;
+                    break;
+                case "S":  // Down
+                    newRow++;
+                    break;
+                case "D":  // Right
+                    newCol++;
+                    break;
+                default:
+                    System.out.println("Invalid move. Use W, A, S, or D.");
+                    continue;
+            }
+
+            // Check if the move is valid
+            if (mazeGenerator.isMoveValid(newRow, newCol)) {
+                // Update player position
+                playerRow = newRow;
+                playerCol = newCol;
+            } else {
+                System.out.println("You hit a wall! Try a different direction.");
+            }
+
+            // Check if the player has reached the finish line
+            if (playerRow == finishRow && playerCol == finishCol) {
+                System.out.println("Congratulations! You've reached the finish line (私)!");
+
+                // Run the pathfinding algorithms when the player reaches the end
+                List<int[]> fastestPath = mazeGenerator.findFastestPath(startRow, startCol, finishRow, finishCol);
+                System.out.println("Fastest path (shortest): " + fastestPath.size() + " steps.");
+                for (int[] step : fastestPath) {
+                    System.out.print(Arrays.toString(step) + " ");
+                }
+                System.out.println();
+
+                gameRunning = false;  // End the game
+            }
+        }
+
+        scanner.close();
+    }
+}
